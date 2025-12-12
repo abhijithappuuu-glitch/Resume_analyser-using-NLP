@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+bcrypt
+spacy>=3.7.0
+scikit-learn
+pdfminer.six
+python-docx
+pandas
