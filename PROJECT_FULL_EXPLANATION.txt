@@ -1,0 +1,367 @@
+PROJECT: ResumeAI — End-to-End Resume Analyzer using NLP
+
+Overview
+- Purpose: Analyze resumes against job descriptions (JDs) to compute ATS score, highlight matched/missing skills, and provide suggestions.
+- Components: Frontend (React + Vite + Tailwind), Backend (FastAPI), Database (SQLite), NLP Pipeline (Python).
+- Users: Two roles — Student (analyze a single resume vs multiple JDs), Recruiter (rank multiple resumes vs multiple JDs).
+
+Architecture
+- Client (Frontend): Single-page app with routing to Login, Student Dashboard, and Recruiter Dashboard. visualized with Recharts, animated via Framer Motion, and styled with Tailwind.
+- Server (Backend): FastAPI app exposing endpoints for auth, resume analysis, and candidate ranking.
+- Data: SQLite file `resume_analyzer.db` managed via helper functions in `backend/database.py`.
+- NLP: Rule-based parsing + keyword matching + skill extraction, scoring via `backend/utils.py` functions.
+
+Folder Structure
+resume_analyzer/
+  backend/
+    main.py              # FastAPI routes and app setup
+    database.py          # SQLite init, user registration/auth
+    utils.py             # NLP parsing, scoring, suggestion generation
+    run_backend.py       # uvicorn runner for FastAPI
+  frontend/
+    src/
+      App.jsx            # App shell + nav + routing + transitions
+      index.css          # Tailwind + custom glass styles + animations
+      main.jsx           # React mount, Router setup
+      components/
+        Login.jsx                # Auth UI; register/login form
+        StudentDashboard.jsx     # Resume vs multiple JDs analysis UI
+        RecruiterDashboard.jsx   # Multiple resumes ranking UI
+        UIComponents.jsx         # Reusable UI components library
+    index.html           # Root HTML for Vite
+    package.json         # Dependencies + scripts
+    vite.config.js       # Vite config; dev server
+    tailwind.config.js   # Tailwind setup
+    postcss.config.js    # PostCSS + Tailwind integration
+  start_backend.bat      # Windows helper to run backend
+  start_frontend.bat     # Windows helper to run frontend
+  resume_analyzer.db     # SQLite database file (auto-created if missing)
+
+Frontend — Detailed
+1) Tools
+- React 18 (SPA)
+- Vite 5 (dev/build tooling)
+- Tailwind CSS 3 (utility-first styling)
+- Framer Motion (animation)
+- Lucide React (icons)
+- Recharts (charts)
+- Axios (HTTP requests)
+- React Router v6 (routes)
+
+2) Pages & Components
+- App.jsx
+  - State: `user`, `isLoading`
+  - Nav: Animated glass nav, shows logged-in user chip + logout
+  - Routes:
+    - `/` → Login (unauthenticated); redirect to `/student` or `/recruiter` when logged in
+    - `/student` → StudentDashboard (student only)
+    - `/recruiter` → RecruiterDashboard (recruiter only)
+  - Loading overlay, decorative parallax elements.
+
+- Login.jsx
+  - Modes: Login and Register toggle
+  - Fields: name (register), role (register), email, password
+  - API:
+    - POST `/api/login` → `{ authenticated, user_name, user_role, ... }`
+    - POST `/api/register` → `{ message }`
+  - UX: Glass cards, inline validation, animated alerts.
+
+- StudentDashboard.jsx
+  - Inputs:
+    - Resume file (PDF/DOCX/TXT)
+    - Multiple JD inputs (file or optional text)
+  - Flow:
+    - For each JD: POST `/api/analyze-resume` with `resume` and `jd` (or `jd_text_input`)
+    - Collect results → charts + insights
+  - Outputs:
+    - Line chart of ATS scores across all JDs
+    - Radar chart per JD (Skill Match, Keyword Density, Experience Match)
+    - Best match metrics, matched skills badges, suggestions
+  - State: `resume`, `jds[]`, `results[]`, `loading`, `error`, `success`, `uploadProgress`
+
+- RecruiterDashboard.jsx
+  - Inputs:
+    - JD files (one or more)
+    - Multiple resumes (bulk upload)
+  - Flow:
+    - For each JD: POST `/api/rank-candidates` with JD + all resumes
+    - Produce ranking list per JD
+  - Outputs:
+    - Bar chart of top 5 candidates (ATS + Skill Match)
+    - Line chart of ATS trend across all candidates
+    - Table with candidate name, ATS score, skill match %, missing skills
+    - Download CSV per JD
+  - State: `jds[]`, `resumes[]`, `results[]`, `loading`, `error`, `success`, `uploadProgress`
+
+- UIComponents.jsx (Library)
+  - Alert(type, message, onClose)
+  - LoadingSpinner(size, text)
+  - ProgressBar(value, max, label, color)
+  - Badge(variant, size)
+  - Card(hover)
+  - StatCard(icon, label, value, trend?, color)
+  - Skeleton(width, height)
+  - EmptyState(icon, title, description, action?)
+  - Tooltip(content, position)
+  - Toggle(enabled, onChange, label)
+
+3) Styling (index.css)
+- Glass morphism panels, inputs, buttons
+- Animated background gradients
+- Custom scrollbars, skeletons, shimmer effects
+- Utility animations (pulse, float, progress)
+
+4) Frontend HTTP Endpoints (via Axios)
+- `/api/register` → register user
+- `/api/login` → authenticate user
+- `/api/analyze-resume` → compute ATS score for resume vs JD
+- `/api/rank-candidates` → rank multiple resumes vs JD
+
+5) Running Frontend
+- Commands:
+  - `npm install`
+  - `npm run dev`
+- Dev server default port: 5173 (auto-switches to next if busy)
+- Configure proxy if needed (Vite dev server + backend localhost:8000): use `vite.config.js` proxy or call absolute URLs.
+
+Backend — Detailed
+1) Frameworks & Libraries
+- FastAPI for REST API
+- Uvicorn for ASGI server
+- Pydantic for models
+- SQLite via `sqlite3` (standard library) or lightweight wrappers
+- PDF/DOCX/TXT parsing helpers (implemented in `utils.py`, typically using PyPDF2/docx/text processing)
+
+2) Entrypoints
+- `backend/run_backend.py` → uvicorn runner
+  - Host: 127.0.0.1
+  - Port: 8000
+  - Reload: True (dev)
+- `backend/main.py` → FastAPI app
+
+3) Routes
+- POST `/register`
+  - Input: { name, email, password, role }
+  - Logic: `register_user_db()` → create user; hash password; check duplicate email
+  - Output: { message } or 400 (duplicate)
+
+- POST `/login`
+  - Input: { email, password }
+  - Logic: `authenticate_user_db()` → verify password; return user profile
+  - Output: { authenticated: bool, user_name, user_role, ... } or 401
+
+- POST `/analyze-resume`
+  - Multipart form:
+    - `resume`: UploadFile (PDF/DOCX/TXT)
+    - `jd`: UploadFile (optional)
+    - `jd_text_input`: string (optional)
+  - Pipeline:
+    1) Read resume → bytes → `extract_text_from_bytes()` based on content type
+    2) Read JD → file or text fallback
+    3) `parse_resume()` → extract sections, skills, experience
+    4) `parse_jd()` → required skills, experience requirements
+    5) `calculate_ats_score()` → returns (score, match_details, required_skills)
+    6) `generate_suggestions()` → missing skills/inclusions
+  - Output: {
+      ats_score: float (0-100),
+      match_details: {
+        Skill Match: %, Keyword Density: %, Experience Match: %, Matched Skills: [...],
+        Resume Experience: X years, Required Experience: Y years
+      },
+      suggestions: [ "Add X skill", ... ],
+      parsed_resume: { sections, normalized tokens, etc }
+    }
+
+- POST `/rank-candidates`
+  - Multipart form:
+    - `jd`: UploadFile
+    - `resumes`: List[UploadFile]
+  - Pipeline:
+    1) Parse JD → required skills list
+    2) For each resume → parse and score vs JD
+    3) Compute missing skills (required − matched)
+    4) Aggregate candidates with metrics
+    5) Sort descending by `ats_score`
+  - Output: [ { candidate_name, ats_score, skill_match, keyword_density, matched_skills, missing_skills }, ... ]
+
+4) CORS
+- `allow_origins=["*"]` in dev for easier integration with Vite
+
+5) Running Backend
+- Windows PowerShell:
+  - `python -m pip install -r backend/requirements.txt` (if a reqs file exists; otherwise install needed libs)
+  - `python backend/run_backend.py`
+- Or use provided batch:
+  - `start_backend.bat` (runs uvicorn with reload)
+
+Database — Detailed
+1) Storage
+- SQLite file `resume_analyzer.db` in repo root, created on first run by `setup_database()`.
+
+2) Tables (typical)
+- `users` → id (int PK), name, email (unique), password_hash, role ("student"|"recruiter"), created_at
+- Additional tables can be added later (e.g., analysis history, resumes metadata).
+
+3) Operations
+- `setup_database()` → ensure tables exist
+- `register_user_db(name, email, password, role)`
+  - validate role
+  - hash password (bcrypt or PBKDF2)
+  - insert user; return success/message
+- `authenticate_user_db(email, password)`
+  - find user by email
+  - verify hash
+  - return { authenticated, user_name, user_role }
+
+NLP — Detailed
+1) Text Extraction (`extract_text_from_bytes`)
+- PDF → parse pages via PyPDF2/pdfminer; fallback to OCR in future
+- DOCX → python-docx; join paragraphs
+- TXT → decode bytes; normalize newlines
+- Return "Error: ..." on unsupported formats or read failures
+
+2) Resume Parsing (`parse_resume`)
+- Steps:
+  - Normalize text: lowercasing, trimming, punctuation removal
+  - Section detection: Education, Experience, Skills, Projects
+  - Experience years estimation: regex patterns for dates, compute duration
+  - Skill tokenization: extract skill phrases (e.g., Python, SQL, ML, Pandas, NLP)
+
+3) JD Parsing (`parse_jd`)
+- Steps:
+  - Tokenize text
+  - Extract required skills via keyword dictionary and fuzzy matching
+  - Extract required experience (years)
+
+4) Scoring (`calculate_ats_score`)
+- Components (weights example):
+  - Skill Match (45%) → fraction of JD skills found in resume
+  - Keyword Density (35%) → frequency of JD terms in resume
+  - Experience Match (20%) → compare resume years vs required
+- Normalize to 0–100; return `match_details` with breakdown
+
+5) Suggestions (`generate_suggestions`)
+- Identify missing skills: `required_skills − matched_skills`
+- Produce actionable messages: "Consider adding Kubernetes experience"
+- Additional heuristics: highlight low density keywords; suggest formatting improvements
+
+Data Flow (Student)
+1) Upload resume (client) + JD(s)
+2) For each JD → POST to backend → get score + details
+3) Visualize in charts; show insights and suggestions
+
+Data Flow (Recruiter)
+1) Upload JD(s) + multiple resumes
+2) For each JD → backend processes all resumes → returns ranked list
+3) Visualize rankings; export CSV
+
+Error Handling
+- Frontend
+  - Alerts for API errors (400/401/500)
+  - Loading overlay; disabled buttons during requests
+  - Validation for required inputs (resume required, JD optional text fallback)
+- Backend
+  - Raise HTTP 400 on bad files
+  - Raise HTTP 401 on invalid auth
+  - Try/except around resume parsing, skip invalid files in ranking
+
+Security & CORS
+- Dev CORS `allow_origins=["*"]` — tighten in production
+- Password hashing in DB
+- No tokens/session implemented yet → simple demo auth; add JWT later
+
+Local Run Instructions (Windows PowerShell)
+Backend:
+1) Ensure Python 3.10+
+2) Install libs:
+   python -m pip install fastapi uvicorn pydantic python-docx PyPDF2
+3) Start server:
+   python backend/run_backend.py
+4) Server listens on:
+   http://127.0.0.1:8000
+
+Frontend:
+1) Install Node 18+ and npm
+2) Install deps:
+   cd frontend
+   npm install
+3) Run dev:
+   npm run dev
+4) App at:
+   http://localhost:5173 (or 5174 if busy)
+
+API Contract (Simplified)
+- POST /register
+  Request: { name, email, password, role }
+  Response: { message }
+
+- POST /login
+  Request: { email, password }
+  Response: { authenticated, user_name, user_role }
+
+- POST /analyze-resume
+  Form-Data: resume (file), jd (file optional), jd_text_input (string optional)
+  Response: {
+    ats_score: number,
+    match_details: { Skill Match, Keyword Density, Experience Match, Matched Skills, Resume Experience, Required Experience },
+    suggestions: string[],
+    parsed_resume: object
+  }
+
+- POST /rank-candidates
+  Form-Data: jd (file), resumes[] (file list)
+  Response: [{ candidate_name, ats_score, skill_match, keyword_density, matched_skills, missing_skills }]
+
+Common Issues & Fixes
+- 500 errors on /api/login or /api/register → backend not running or DB schema not initialized; rerun backend and check `setup_database()`
+- Connection refused from frontend → Vite dev server switched ports; reload page; ensure Axios base URL hits the correct backend URL
+- File parsing errors → ensure PDF/DOCX/TXT only; check `extract_text_from_bytes` content-type handling
+- CORS issues → confirm CORSMiddleware settings; in production restrict `allow_origins`
+
+Extensibility Roadmap
+- Add JWT auth and refresh tokens
+- Persist analyses to DB with user-specific history
+- Advanced NLP: spaCy, scikit-learn, Transformer-based keyword extraction
+- Semantic skill matching via embeddings (e.g., sentence-transformers)
+- Resume formatting suggestions: bullet density, section order, ATS-friendly formatting
+- Multi-language support and localization
+- Admin dashboard (usage stats, error logs)
+
+Deployment Notes
+- Backend: Containerize (Docker), run behind reverse proxy
+- Frontend: Build with `npm run build`, serve via static hosting (Netlify/Vercel/Nginx)
+- Env variables: configure API base URL for production
+
+Testing
+- Unit tests for utils parsing/scoring functions
+- Integration tests for endpoints with sample files
+- Frontend component tests for critical UI flows
+
+Maintenance
+- Keep dependency versions updated (package.json and Python libs)
+- Monitor CVEs (npm audit/pip-audit)
+- Add logging middleware in FastAPI and frontend error boundaries
+
+Cheatsheet
+- Start Backend:
+  python backend\run_backend.py
+- Start Frontend:
+  cd frontend
+  npm run dev
+- Student Flow:
+  Login → upload resume → add JDs → Analyze → Review charts/suggestions
+- Recruiter Flow:
+  Login → upload JD(s) → upload resumes → Rank → Export CSV
+
+File Glossary
+- backend/main.py: FastAPI app, endpoints
+- backend/database.py: SQLite operations
+- backend/utils.py: NLP parsing & scoring logic
+- backend/run_backend.py: uvicorn runner
+- frontend/src/App.jsx: App shell & routing
+- frontend/src/components/*.jsx: UI views
+- frontend/src/index.css: styles & animations
+- start_backend.bat / start_frontend.bat: helpers
+- resume_analyzer.db: DB file
+
+End of Document
