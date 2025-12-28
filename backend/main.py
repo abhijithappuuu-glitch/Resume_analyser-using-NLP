@@ -43,6 +43,8 @@ class CandidateResult(BaseModel):
     ats_score: float
     skill_match: float
     keyword_density: float
+    experience_match: float
+    resume_quality: float
     matched_skills: str
     missing_skills: str
 
@@ -72,7 +74,7 @@ async def analyze_resume(
     resume_bytes = await resume.read()
     resume_text = extract_text_from_bytes(resume_bytes, resume.content_type)
     
-    if "Error" in resume_text:
+    if (not resume_text) or (not resume_text.strip()) or ("Error" in resume_text):
         raise HTTPException(status_code=400, detail=resume_text)
 
     # Read JD
@@ -85,7 +87,7 @@ async def analyze_resume(
     else:
         final_jd_text = "Highly skilled software engineer with strong Python, Machine Learning, and SQL expertise. Needs 5+ years of experience."
 
-    if "Error" in final_jd_text:
+    if (not final_jd_text) or (not final_jd_text.strip()) or ("Error" in final_jd_text):
         raise HTTPException(status_code=400, detail=final_jd_text)
 
     # Analyze
@@ -142,6 +144,8 @@ async def rank_candidates(
                 "ats_score": ats_score,
                 "skill_match": match_details["Skill Match"],
                 "keyword_density": match_details["Keyword Density"],
+                "experience_match": match_details["Experience Match"],
+                "resume_quality": match_details["Resume Quality"],
                 "matched_skills": ", ".join(match_details["Matched Skills"]),
                 "missing_skills": ", ".join(missing_skills) or "None"
             })

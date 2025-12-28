@@ -10,6 +10,11 @@ __pycache__/
 *.pyd
 *.pyo
 
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Virtual environments
 .venv/
 venv/

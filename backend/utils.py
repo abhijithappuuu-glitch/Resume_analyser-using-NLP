@@ -18,8 +18,9 @@ except:
 
 # Expanded Skill Database with Synonyms
 SKILL_DB = {
+    
     # Programming Languages
-    "python", "java", "c++", "c", "c#", "csharp", "ruby", "php", "swift", "kotlin", "go", "golang", "rust", "typescript", "javascript", "js", "scala", "perl", "r", "matlab", "dart", "lua", "shell", "bash", "powershell", "objective-c", "vb.net", "fortran", "cobol", "haskell", "elixir", "clojure",
+    "python", "java", "c++", "c", "c#", "csharp", "ruby", "php", "swift", "kotlin", "go", "golang", "rust", "typescript", "javascript", "js", "scala", "perl", "r", "matlab", "dart", "lua", "shell", "bash", "powershell", "objective-c", "vb.net", "fortran", "cobol", "haskell", "elixir", "clojure", "DSA"
     # Web Development
     "html", "html5", "css", "css3", "react", "reactjs", "react.js", "angular", "angularjs", "vue", "vuejs", "vue.js", "node.js", "nodejs", "express", "expressjs", "django", "flask", "fastapi", "spring", "spring boot", "springboot", "asp.net", "laravel", "ruby on rails", "rails", "jquery", "bootstrap", "tailwind", "tailwindcss", "sass", "less", "scss", "webpack", "vite", "graphql", "rest", "rest api", "restful", "soap", "ajax", "json", "xml", "nextjs", "next.js", "gatsby", "nuxt", "svelte",
     # Data Science & AI
@@ -48,6 +49,7 @@ SKILL_DB = {
 
 # Skill Synonyms Mapping for better matching
 SKILL_SYNONYMS = {
+    "DSA": ["dsa", "data structures", "algorithms"],
     "javascript": ["js", "javascript", "ecmascript"],
     "python": ["python", "py"],
     "typescript": ["typescript", "ts"],
@@ -77,10 +79,31 @@ SKILL_SYNONYMS = {
 def extract_text_from_bytes(file_bytes, file_type):
     """Extracts text from PDF, DOCX, or TXT files provided as bytes."""
     try:
-        if file_type == "application/pdf":
-            output_string = io.StringIO()
-            extract_text_to_fp(io.BytesIO(file_bytes), output_string)
-            return output_string.getvalue()
+        file_type = (file_type or "").lower().strip()
+
+        # PDF extraction (pdfminer works for text-based PDFs; scanned/image-only PDFs will often return empty text)
+        if file_type in {"application/pdf", "application/x-pdf"} or file_type.endswith("/pdf"):
+            try:
+                output_string = io.StringIO()
+                extract_text_to_fp(io.BytesIO(file_bytes), output_string)
+                extracted = (output_string.getvalue() or "").strip()
+
+                if not extracted:
+                    return (
+                        "Error: No selectable text found in this PDF. "
+                        "This usually means it is scanned/image-only or text is not extractable. "
+                        "Please upload a text-based PDF, or run OCR (e.g., Adobe Scan / Google Drive OCR) and try again."
+                    )
+
+                return extracted
+            except Exception as e:
+                # Keep user-facing message clean; log details server-side.
+                print(f"PDF extraction failed: {e}")
+                return (
+                    "Error: Couldn’t extract text from this PDF. "
+                    "It may be scanned/image-only, encrypted, or corrupted. "
+                    "Please upload a text-based PDF, or run OCR and try again."
+                )
             
         elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
             doc = Document(io.BytesIO(file_bytes))
@@ -89,9 +112,10 @@ def extract_text_from_bytes(file_bytes, file_type):
         elif file_type == "text/plain":
             return file_bytes.decode("utf-8")
             
-        return "Unsupported file format."
+        return "Error: Unsupported file format. Please upload a PDF, DOCX, or TXT file."
     except Exception as e:
-        return f"Error extracting text: {str(e)}"
+        print(f"Text extraction failed: {e}")
+        return "Error: Failed to extract text from the uploaded file."
 
 def clean_text(text):
     """Cleans text while preserving technical terms like C++, C#, .NET, Node.js"""

@@ -11,9 +11,19 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState([])
   const [error, setError] = useState('')
+  const [errorType, setErrorType] = useState('error')
   const [success, setSuccess] = useState('')
   const [showHelp, setShowHelp] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+
+  const getAlertTypeFromMessage = (message) => {
+    if (!message) return 'error'
+    const m = String(message)
+    if (m.includes('No selectable text found in this PDF') || m.includes("Couldn’t extract text from this PDF") || m.includes("Couldn't extract text from this PDF")) {
+      return 'warning'
+    }
+    return 'error'
+  }
 
   const handleAddJd = () => {
     setJds([...jds, { id: Date.now(), file: null, text: '' }])
@@ -37,6 +47,7 @@ export default function StudentDashboard() {
 
     setLoading(true)
     setError('')
+    setErrorType('error')
     setSuccess('')
     setResults([])
     setUploadProgress(0)
@@ -69,7 +80,9 @@ export default function StudentDashboard() {
       setResults(newResults)
       setSuccess('Analysis completed successfully!')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Analysis failed')
+      const message = err.response?.data?.detail || 'Analysis failed'
+      setErrorType(getAlertTypeFromMessage(message))
+      setError(message)
     } finally {
       setLoading(false)
       setUploadProgress(0)
@@ -148,7 +161,7 @@ export default function StudentDashboard() {
       {/* Alerts */}
       <AnimatePresence>
         {error && (
-          <Alert type="error" message={error} onClose={() => setError('')} />
+          <Alert type={errorType} message={error} onClose={() => setError('')} />
         )}
         {success && (
           <Alert type="success" message={success} onClose={() => setSuccess('')} />
@@ -177,7 +190,7 @@ export default function StudentDashboard() {
                 whileHover={{ scale: 1.02 }}
                 className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 p-5 rounded-xl border border-green-500/20"
               >
-                <div className="text-2xl font-bold text-green-400 mb-2">45%</div>
+                <div className="text-2xl font-bold text-green-400 mb-2">40%</div>
                 <span className="font-bold text-green-300">Skill Match</span>
                 <p className="text-[var(--text-secondary)] text-sm mt-2">Presence of required technical and soft skills.</p>
               </motion.div>
@@ -193,9 +206,18 @@ export default function StudentDashboard() {
                 whileHover={{ scale: 1.02 }}
                 className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 p-5 rounded-xl border border-purple-500/20"
               >
-                <div className="text-2xl font-bold text-purple-400 mb-2">20%</div>
+                <div className="text-2xl font-bold text-purple-400 mb-2">15%</div>
                 <span className="font-bold text-purple-300">Experience</span>
                 <p className="text-[var(--text-secondary)] text-sm mt-2">Years of experience mentioned vs required.</p>
+              </motion.div>
+
+              <motion.div 
+                whileHover={{ scale: 1.02 }}
+                className="bg-gradient-to-br from-amber-500/10 to-yellow-500/10 p-5 rounded-xl border border-amber-500/20"
+              >
+                <div className="text-2xl font-bold text-amber-400 mb-2">10%</div>
+                <span className="font-bold text-amber-300">Resume Quality</span>
+                <p className="text-[var(--text-secondary)] text-sm mt-2">Basic completeness: email, phone, education, skills, experience.</p>
               </motion.div>
             </div>
           </motion.div>
@@ -378,6 +400,7 @@ export default function StudentDashboard() {
               { subject: 'Skills', A: result.match_details["Skill Match"], fullMark: 100 },
               { subject: 'Keywords', A: result.match_details["Keyword Density"], fullMark: 100 },
               { subject: 'Experience', A: result.match_details["Experience Match"], fullMark: 100 },
+              { subject: 'Quality', A: result.match_details["Resume Quality"], fullMark: 100 },
             ];
 
             return (
@@ -397,6 +420,10 @@ export default function StudentDashboard() {
                       result.ats_score > 40 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
                     }`}>{result.ats_score}%</span>
                   </div>
+                </div>
+
+                <div className="text-sm text-[var(--text-secondary)] mb-6">
+                  ATS basis: Skills 40% + Keywords 35% + Experience 15% + Resume Quality 10%
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

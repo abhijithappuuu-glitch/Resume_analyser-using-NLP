@@ -3,7 +3,7 @@
 Place your MP4 here so the Welcome page can load it:
 
 - Copy your file from:
-  - `C:\Users\User\OneDrive\Desktop\256b6bce493cffcf3221343ef0551df1.mp4`
+  - `C:\Users\User\Downloads\snow-falling-windows-7-video-background-dreamscene-adobe-after-effects-1080-publer.io.mp4`
 - Into this folder:
   - `frontend/public/`
 - Rename it to exactly:

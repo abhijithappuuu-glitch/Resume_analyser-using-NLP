@@ -11,9 +11,19 @@ export default function RecruiterDashboard() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState([]) // Array of { jdName, rankings: [] }
   const [error, setError] = useState('')
+  const [errorType, setErrorType] = useState('error')
   const [success, setSuccess] = useState('')
   const [showHelp, setShowHelp] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+
+  const getAlertTypeFromMessage = (message) => {
+    if (!message) return 'error'
+    const m = String(message)
+    if (m.includes('No selectable text found in this PDF') || m.includes("Couldn’t extract text from this PDF") || m.includes("Couldn't extract text from this PDF")) {
+      return 'warning'
+    }
+    return 'error'
+  }
 
   const handleAddJd = () => {
     setJds([...jds, { id: Date.now(), file: null }])
@@ -38,6 +48,7 @@ export default function RecruiterDashboard() {
 
     setLoading(true)
     setError('')
+    setErrorType('error')
     setSuccess('')
     setResults([])
     setUploadProgress(0)
@@ -69,7 +80,9 @@ export default function RecruiterDashboard() {
       setResults(allRankings)
       setSuccess('Ranking completed successfully!')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Ranking failed')
+      const message = err.response?.data?.detail || 'Ranking failed'
+      setErrorType(getAlertTypeFromMessage(message))
+      setError(message)
     } finally {
       setLoading(false)
       setUploadProgress(0)
@@ -89,7 +102,7 @@ export default function RecruiterDashboard() {
   const downloadCSV = (rankings, jdName) => {
     if (rankings.length === 0) return
 
-    const headers = ['Candidate', 'ATS Score', 'Skill Match', 'Keyword Density', 'Matched Skills', 'Missing Skills']
+    const headers = ['Candidate', 'ATS Score', 'Skill Match', 'Keyword Density', 'Experience Match', 'Resume Quality', 'Matched Skills', 'Missing Skills']
     const csvContent = [
       headers.join(','),
       ...rankings.map(r => [
@@ -97,6 +110,8 @@ export default function RecruiterDashboard() {
         r.ats_score,
         r.skill_match,
         r.keyword_density,
+        r.experience_match,
+        r.resume_quality,
         `"${r.matched_skills}"`,
         `"${r.missing_skills}"`
       ].join(','))
@@ -173,7 +188,7 @@ export default function RecruiterDashboard() {
       {/* Alerts */}
       <AnimatePresence>
         {error && (
-          <Alert type="error" message={error} onClose={() => setError('')} />
+          <Alert type={errorType} message={error} onClose={() => setError('')} />
         )}
         {success && (
           <Alert type="success" message={success} onClose={() => setSuccess('')} />
@@ -309,6 +324,10 @@ export default function RecruiterDashboard() {
                 </button>
               </div>
 
+              <div className="px-6 py-3 text-sm text-[var(--text-secondary)] border-b border-black/10 dark:border-white/10">
+                ATS basis: Skills 40% + Keywords 35% + Experience 15% + Resume Quality 10%
+              </div>
+
               {/* Graph Section */}
               <div className="p-6 border-b border-black/10 dark:border-white/10">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -398,13 +417,18 @@ export default function RecruiterDashboard() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">#{idx + 1}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)] opacity-80">{result.candidate_name}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          <div className="space-y-1">
+                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             result.ats_score > 70 ? 'bg-green-500/10 text-green-700 dark:text-green-200 border border-green-500/20' : 
                             result.ats_score > 40 ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-200 border border-yellow-500/20' : 
                             'bg-red-500/10 text-red-700 dark:text-red-200 border border-red-500/20'
                           }`}>
                             {result.ats_score}%
-                          </span>
+                            </span>
+                            <div className="text-xs text-[var(--text-secondary)] whitespace-nowrap">
+                              Skills {result.skill_match}% · Keywords {result.keyword_density}% · Exp {result.experience_match}% · Quality {result.resume_quality}%
+                            </div>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)]">{result.skill_match}%</td>
                         <td className="px-6 py-4 text-sm text-[var(--text-secondary)] opacity-80 max-w-xs truncate" title={result.missing_skills}>

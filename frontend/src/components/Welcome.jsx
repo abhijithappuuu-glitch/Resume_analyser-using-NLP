@@ -5,7 +5,17 @@ export default function Welcome({ onContinue }) {
   return (
     <div className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] w-screen">
       <div className="relative min-h-screen overflow-hidden">
-        {/* Subtle overlays for readability; the static background image is set on <body> */}
+        {/* Background video */}
+        <video
+          className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+          src="/welcome-bg.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+
+        {/* Subtle overlays for readability */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 bg-black/10" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-black/10 to-black/15" />
